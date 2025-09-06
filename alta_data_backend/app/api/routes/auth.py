@@ -10,7 +10,12 @@ from passlib.context import CryptContext
 from ...database import get_db
 from ...models.user import User
 from ...models.invitation import EmailVerificationToken
-from ...schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserResponse
+from ...schemas.auth import TokenResponse, UserResponse
+from ...schemas.auth_validators import (
+    RegisterRequest, LoginRequest, EmailVerificationRequest,
+    PasswordResetRequest, PasswordResetConfirmRequest, ChangePasswordRequest,
+    UpdateProfileRequest
+)
 from ...core.security import create_access_token
 from ...core.email import send_email
 from ...api.dependencies import get_current_user
@@ -65,7 +70,22 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
 
     verify_link = f'https://frontend.example.com/verify-email?token={raw_token}'
     try:
-        send_email(user.email, 'Verify your email', f'Click to verify: {verify_link}')
+        # Create outbox event for email sending
+        from ...services.outbox_service import outbox_service
+        from ...models.outbox import OutboxEventType
+        
+        await outbox_service.create_event(
+            session=db,
+            event_type=OutboxEventType.EMAIL_SEND_REQUESTED,
+            aggregate_id=user.id,
+            aggregate_type="User",
+            payload={
+                "to_email": user.email,
+                "subject": "Verify your email",
+                "body": f'Click to verify: {verify_link}',
+                "email_type": "email_verification"
+            }
+        )
     except Exception:
         pass
 
@@ -85,8 +105,8 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get('/verify-email')
-async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
+async def verify_email(request: EmailVerificationRequest, db: AsyncSession = Depends(get_db)):
+    token_hash = hashlib.sha256(request.token.encode()).hexdigest()
     res = await db.execute(select(EmailVerificationToken).where(EmailVerificationToken.token_hash == token_hash))
     rec = res.scalar_one_or_none()
     if not rec or rec.expires_at < datetime.now(timezone.utc):

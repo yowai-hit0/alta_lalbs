@@ -16,7 +16,25 @@ class Settings(BaseSettings):
     postgres_user: str = 'postgres'
     postgres_password: str = 'postgres'
 
+    # Redis Configuration (for caching, rate limiting, sessions)
     redis_url: str = 'redis://localhost:6379/0'
+    redis_host: str = 'localhost'
+    redis_port: int = 6379
+    redis_db: int = 0
+
+    # RabbitMQ Configuration (for background processing)
+    rabbitmq_url: str = 'amqp://guest:guest@localhost:5672//'
+    rabbitmq_host: str = 'localhost'
+    rabbitmq_port: int = 5672
+    rabbitmq_user: str = 'guest'
+    rabbitmq_password: str = 'guest'
+    rabbitmq_vhost: str = '/'
+
+    # Outbox Pattern Configuration
+    outbox_batch_size: int = 100
+    outbox_processing_interval: int = 20  # seconds
+    outbox_max_retries: int = 3
+    outbox_retry_delay: int = 60  # seconds
 
     smtp_host: str = 'localhost'
     smtp_port: int = 25

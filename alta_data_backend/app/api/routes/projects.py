@@ -8,7 +8,12 @@ from ...database import get_db
 from ...models.project import Project, ProjectMember
 from ...models.user import User
 from ...models.invitation import EmailVerificationToken, ProjectInvitation
-from ...schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, InvitationCreate, InvitationAccept, SubmitForReviewRequest
+from ...schemas.project import ProjectResponse
+from ...schemas.project_validators import (
+    ProjectCreateRequest, ProjectUpdateRequest, ProjectInvitationRequest, 
+    InvitationAcceptRequest, ProjectMemberUpdateRequest, ProjectSearchRequest,
+    ProjectArchiveRequest, ProjectSettingsUpdateRequest, ProjectStatisticsRequest
+)
 from ..dependencies import get_current_user, project_role_required, require_global_roles
 
 
@@ -23,7 +28,7 @@ async def list_projects(db: AsyncSession = Depends(get_db), current_user=Depends
 
 @router.post('', response_model=ProjectResponse)
 async def create_project(
-    payload: ProjectCreate, db: AsyncSession = Depends(get_db), current_user=Depends(require_global_roles('user', 'super_admin'))
+    payload: ProjectCreateRequest, db: AsyncSession = Depends(get_db), current_user=Depends(require_global_roles('user', 'super_admin'))
 ):
     owner = current_user
     project = Project(name=payload.name, description=payload.description or '', created_by_id=owner.id)
@@ -45,7 +50,7 @@ async def get_project(project_id: str, db: AsyncSession = Depends(get_db), curre
 @router.put('/{project_id}', response_model=ProjectResponse)
 async def update_project(
     project_id: str,
-    payload: ProjectUpdate,
+    payload: ProjectUpdateRequest,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin')),
 ):
@@ -73,7 +78,7 @@ async def delete_project(project_id: str, db: AsyncSession = Depends(get_db), cu
 @router.post('/{project_id}/invite')
 async def invite_member(
     project_id: str,
-    payload: InvitationCreate,
+    payload: ProjectInvitationRequest,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin')),
 ):
@@ -87,8 +92,8 @@ async def invite_member(
 
 
 @router.post('/invitations/{token}/accept')
-async def accept_invitation(token: str, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
+async def accept_invitation(request: InvitationAcceptRequest, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
+    token_hash = hashlib.sha256(request.token.encode()).hexdigest()
     inv = (await db.execute(select(ProjectInvitation).where(ProjectInvitation.token_hash == token_hash))).scalar_one_or_none()
     if not inv or inv.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail='Invalid or expired token')

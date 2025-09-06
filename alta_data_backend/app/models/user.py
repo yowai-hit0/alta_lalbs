@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import String, Boolean, DateTime
-from datetime import datetime, timezone
+from sqlalchemy import String, Boolean
 from uuid import uuid4
 from ..database import Base
 
@@ -13,7 +12,5 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255))
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     global_role: Mapped[str] = mapped_column(String(32), default='user')
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 

@@ -1,5 +1,11 @@
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
+from ...schemas.analytics_validators import (
+    AnalyticsSummaryRequest, UserAnalyticsRequest, ProjectAnalyticsRequest,
+    DocumentAnalyticsRequest, VoiceAnalyticsRequest, ReviewAnalyticsRequest,
+    SystemAnalyticsRequest, CustomAnalyticsRequest, ExportAnalyticsRequest,
+    AnalyticsDashboardRequest
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from ...database import get_db
