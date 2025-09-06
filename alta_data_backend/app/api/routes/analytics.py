@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from ...schemas.analytics_validators import (
     AnalyticsSummaryRequest, UserAnalyticsRequest, ProjectAnalyticsRequest,
     DocumentAnalyticsRequest, VoiceAnalyticsRequest, ReviewAnalyticsRequest,
@@ -78,7 +78,7 @@ async def analytics_summary(
 
 
 @router.get('/user/{userId}')
-async def user_analytics(userId: str, timeframe: str = Query('7d'), db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
+async def user_analytics(userId: str = Path(..., description='User ID'), timeframe: str = Query('7d'), db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
     since = parse_timeframe(timeframe)
     total_contribs = (await db.execute(select(func.count()).select_from(Document).where(Document.uploaded_by_id == userId, Document.created_at >= since))).scalar()
     contrib_daily = (await db.execute(

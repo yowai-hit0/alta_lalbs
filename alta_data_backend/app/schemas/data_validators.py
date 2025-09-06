@@ -8,7 +8,7 @@ class DocumentUploadRequest(BaseModel):
     project_id: str = Field(..., description="Project ID")
     domain: Optional[str] = Field(None, max_length=120, description="Document domain")
     tags: Optional[List[str]] = Field(None, description="Document tags")
-    metadata: Optional[dict] = Field(None, description="Additional metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional metadata")
     
     @validator('project_id')
     def validate_project_id(cls, v):
@@ -48,7 +48,7 @@ class DocumentUploadRequest(BaseModel):
             return [tag.strip() for tag in v if tag.strip()]
         return v
     
-    @validator('metadata')
+    @validator('extra_metadata')
     def validate_metadata(cls, v):
         """Validate metadata"""
         if v is not None:
@@ -66,7 +66,7 @@ class VoiceUploadRequest(BaseModel):
     project_id: str = Field(..., description="Project ID")
     language: Optional[str] = Field(None, max_length=10, description="Audio language code")
     tags: Optional[List[str]] = Field(None, description="Audio tags")
-    metadata: Optional[dict] = Field(None, description="Additional metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional metadata")
     
     @validator('project_id')
     def validate_project_id(cls, v):
@@ -106,7 +106,7 @@ class VoiceUploadRequest(BaseModel):
             return [tag.strip() for tag in v if tag.strip()]
         return v
     
-    @validator('metadata')
+    @validator('extra_metadata')
     def validate_metadata(cls, v):
         """Validate metadata"""
         if v is not None:
@@ -123,7 +123,7 @@ class DocumentUpdateRequest(BaseModel):
     """Document update request"""
     domain: Optional[str] = Field(None, max_length=120, description="Document domain")
     tags: Optional[List[str]] = Field(None, description="Document tags")
-    metadata: Optional[dict] = Field(None, description="Additional metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional metadata")
     
     @validator('domain')
     def validate_domain(cls, v):
@@ -154,7 +154,7 @@ class DocumentUpdateRequest(BaseModel):
             return [tag.strip() for tag in v if tag.strip()]
         return v
     
-    @validator('metadata')
+    @validator('extra_metadata')
     def validate_metadata(cls, v):
         """Validate metadata"""
         if v is not None:
@@ -171,7 +171,7 @@ class VoiceUpdateRequest(BaseModel):
     """Voice update request"""
     language: Optional[str] = Field(None, max_length=10, description="Audio language code")
     tags: Optional[List[str]] = Field(None, description="Audio tags")
-    metadata: Optional[dict] = Field(None, description="Additional metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional metadata")
     
     @validator('language')
     def validate_language(cls, v):
@@ -202,7 +202,7 @@ class VoiceUpdateRequest(BaseModel):
             return [tag.strip() for tag in v if tag.strip()]
         return v
     
-    @validator('metadata')
+    @validator('extra_metadata')
     def validate_metadata(cls, v):
         """Validate metadata"""
         if v is not None:
@@ -310,7 +310,7 @@ class RawTextCreateRequest(BaseModel):
     content: str = Field(..., min_length=1, description="Text content")
     domain: Optional[str] = Field(None, max_length=120, description="Text domain")
     tags: Optional[List[str]] = Field(None, description="Text tags")
-    metadata: Optional[dict] = Field(None, description="Additional metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional metadata")
     
     @validator('project_id')
     def validate_project_id(cls, v):
@@ -366,7 +366,7 @@ class RawTextCreateRequest(BaseModel):
             return [tag.strip() for tag in v if tag.strip()]
         return v
     
-    @validator('metadata')
+    @validator('extra_metadata')
     def validate_metadata(cls, v):
         """Validate metadata"""
         if v is not None:
@@ -385,7 +385,7 @@ class RawTextUpdateRequest(BaseModel):
     content: Optional[str] = Field(None, min_length=1, description="Text content")
     domain: Optional[str] = Field(None, max_length=120, description="Text domain")
     tags: Optional[List[str]] = Field(None, description="Text tags")
-    metadata: Optional[dict] = Field(None, description="Additional metadata")
+    extra_metadata: Optional[dict] = Field(None, description="Additional metadata")
     
     @validator('title')
     def validate_title(cls, v):
@@ -436,7 +436,7 @@ class RawTextUpdateRequest(BaseModel):
             return [tag.strip() for tag in v if tag.strip()]
         return v
     
-    @validator('metadata')
+    @validator('extra_metadata')
     def validate_metadata(cls, v):
         """Validate metadata"""
         if v is not None:

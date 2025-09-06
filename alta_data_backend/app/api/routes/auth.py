@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 import os
 import redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,7 +52,7 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 @router.post('/register', response_model=UserResponse)
-async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(payload: RegisterRequest = Body(...), db: AsyncSession = Depends(get_db)):
     if not ratelimit(f"rl:register:{payload.email}", 10, 60):
         raise HTTPException(status_code=429, detail='Too many requests')
     existing = await db.execute(select(User).where(User.email == payload.email))
@@ -93,7 +93,7 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
 
 
 @router.post('/login', response_model=TokenResponse)
-async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(payload: LoginRequest = Body(...), db: AsyncSession = Depends(get_db)):
     if not ratelimit(f"rl:login:{payload.email}", 10, 60):
         raise HTTPException(status_code=429, detail='Too many requests')
     res = await db.execute(select(User).where(User.email == payload.email))
@@ -105,7 +105,7 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get('/verify-email')
-async def verify_email(request: EmailVerificationRequest, db: AsyncSession = Depends(get_db)):
+async def verify_email(request: EmailVerificationRequest = Body(...), db: AsyncSession = Depends(get_db)):
     token_hash = hashlib.sha256(request.token.encode()).hexdigest()
     res = await db.execute(select(EmailVerificationToken).where(EmailVerificationToken.token_hash == token_hash))
     rec = res.scalar_one_or_none()

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, Path
 from ...schemas.review_validators import (
     ReviewDecisionRequest, SubmitForReviewRequest, ReviewQueueRequest,
     ReviewHistoryRequest, ReviewStatisticsRequest, ReviewAssignmentRequest,
@@ -17,7 +17,7 @@ router = APIRouter(prefix='/review', tags=['review'])
 
 
 @router.get('')
-async def review_queue(project_id: str, db: AsyncSession = Depends(get_db), current_user=Depends(project_role_required('reviewer', 'admin'))):
+async def review_queue(project_id: str = Query(..., description="Project ID"), db: AsyncSession = Depends(get_db), current_user=Depends(project_role_required('reviewer', 'admin'))):
     """Get review queue for a project - includes documents, voice samples, and raw texts"""
     # Get pending documents
     docs = await db.execute(
@@ -87,9 +87,9 @@ async def review_queue(project_id: str, db: AsyncSession = Depends(get_db), curr
 
 @router.patch('/{item_id}')
 async def review_decision(
-    item_id: str, 
+    item_id: str = Path(..., description="ID of the item to review"),
     item_type: str = Query(..., description="Type: 'document', 'voice', or 'raw_text'"),
-    request: ReviewDecisionRequest, 
+    request: ReviewDecisionRequest = Body(...),
     db: AsyncSession = Depends(get_db), 
     current_user=Depends(project_role_required('reviewer', 'admin'))
 ):

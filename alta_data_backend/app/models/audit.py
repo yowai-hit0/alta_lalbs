@@ -15,6 +15,6 @@ class AuditLog(Base):
     status: Mapped[str] = mapped_column(String(16))
     ip_address: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(255))
-    metadata: Mapped[dict | None] = mapped_column(JSON, default=None)
+    extra_metadata: Mapped[dict | None] = mapped_column(JSON, default=None)
 
 

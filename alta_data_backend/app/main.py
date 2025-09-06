@@ -10,6 +10,14 @@ import asyncio
 
 from .config import settings
 from .database import engine, Base
+
+# Import all models to ensure they're registered with SQLAlchemy
+from .models.user import User
+from .models.project import Project, ProjectMember
+from .models.data import Document, VoiceSample, RawText
+from .models.invitation import EmailVerificationToken, ProjectInvitation
+from .models.audit import AuditLog
+from .models.outbox import OutboxEvent
 from .api.routes.auth import router as auth_router
 from .api.routes.projects import router as projects_router
 from .api.routes.data import router as data_router

@@ -1,19 +1,21 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Path, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, insert, delete
 from ...database import get_db
 from ...models.project import Project, ProjectMember
 from ...models.user import User
 from ...models.invitation import EmailVerificationToken, ProjectInvitation
+from ...models.data import Document
 from ...schemas.project import ProjectResponse
 from ...schemas.project_validators import (
     ProjectCreateRequest, ProjectUpdateRequest, ProjectInvitationRequest, 
     InvitationAcceptRequest, ProjectMemberUpdateRequest, ProjectSearchRequest,
     ProjectArchiveRequest, ProjectSettingsUpdateRequest, ProjectStatisticsRequest
 )
+from ...schemas.review_validators import SubmitForReviewRequest
 from ..dependencies import get_current_user, project_role_required, require_global_roles
 
 
@@ -28,7 +30,7 @@ async def list_projects(db: AsyncSession = Depends(get_db), current_user=Depends
 
 @router.post('', response_model=ProjectResponse)
 async def create_project(
-    payload: ProjectCreateRequest, db: AsyncSession = Depends(get_db), current_user=Depends(require_global_roles('user', 'super_admin'))
+    payload: ProjectCreateRequest = Body(...), db: AsyncSession = Depends(get_db), current_user=Depends(require_global_roles('user', 'super_admin'))
 ):
     owner = current_user
     project = Project(name=payload.name, description=payload.description or '', created_by_id=owner.id)
@@ -40,7 +42,7 @@ async def create_project(
 
 
 @router.get('/{project_id}', response_model=ProjectResponse)
-async def get_project(project_id: str, db: AsyncSession = Depends(get_db), current_user=Depends(project_role_required('admin', 'contributor', 'reviewer'))):
+async def get_project(project_id: str = Path(..., description='Project ID'), db: AsyncSession = Depends(get_db), current_user=Depends(project_role_required('admin', 'contributor', 'reviewer'))):
     p = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
     if not p:
         raise HTTPException(status_code=404, detail='Project not found')
@@ -49,8 +51,8 @@ async def get_project(project_id: str, db: AsyncSession = Depends(get_db), curre
 
 @router.put('/{project_id}', response_model=ProjectResponse)
 async def update_project(
-    project_id: str,
-    payload: ProjectUpdateRequest,
+    project_id: str = Path(..., description='Project ID'),
+    payload: ProjectUpdateRequest = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin')),
 ):
@@ -66,7 +68,7 @@ async def update_project(
 
 
 @router.delete('/{project_id}')
-async def delete_project(project_id: str, db: AsyncSession = Depends(get_db), current_user=Depends(project_role_required('admin'))):
+async def delete_project(project_id: str = Path(..., description='Project ID'), db: AsyncSession = Depends(get_db), current_user=Depends(project_role_required('admin'))):
     p = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
     if not p:
         raise HTTPException(status_code=404, detail='Project not found')
@@ -77,8 +79,8 @@ async def delete_project(project_id: str, db: AsyncSession = Depends(get_db), cu
 
 @router.post('/{project_id}/invite')
 async def invite_member(
-    project_id: str,
-    payload: ProjectInvitationRequest,
+    project_id: str = Path(..., description='Project ID'),
+    payload: ProjectInvitationRequest = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin')),
 ):
@@ -92,7 +94,7 @@ async def invite_member(
 
 
 @router.post('/invitations/{token}/accept')
-async def accept_invitation(request: InvitationAcceptRequest, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
+async def accept_invitation(request: InvitationAcceptRequest = Body(...), db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
     token_hash = hashlib.sha256(request.token.encode()).hexdigest()
     inv = (await db.execute(select(ProjectInvitation).where(ProjectInvitation.token_hash == token_hash))).scalar_one_or_none()
     if not inv or inv.expires_at < datetime.now(timezone.utc):
@@ -110,7 +112,7 @@ async def accept_invitation(request: InvitationAcceptRequest, db: AsyncSession =
 
 
 @router.post('/{project_id}/review')
-async def submit_for_review(project_id: str, body: SubmitForReviewRequest, db: AsyncSession = Depends(get_db), current_user=Depends(project_role_required('admin', 'contributor'))):
+async def submit_for_review(project_id: str = Path(..., description='Project ID'), body: SubmitForReviewRequest = Body(...), db: AsyncSession = Depends(get_db), current_user=Depends(project_role_required('admin', 'contributor'))):
     d = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
     if not d:
         raise HTTPException(status_code=404, detail='Project not found')

@@ -2,7 +2,7 @@ import os
 import mimetypes
 import json
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Path, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from ...database import get_db
@@ -228,7 +228,7 @@ async def upload_voice(
 # Raw Text Management Routes
 @router.post('/raw-text')
 async def create_raw_text(
-    payload: RawTextCreateRequest,
+    payload: RawTextCreateRequest = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin', 'contributor')),
 ):
@@ -268,7 +268,7 @@ async def create_raw_text(
 
 @router.get('/raw-text/{raw_text_id}')
 async def get_raw_text(
-    raw_text_id: str,
+    raw_text_id: str = Path(..., description='Raw text ID'),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -312,8 +312,8 @@ async def get_raw_text(
 
 @router.put('/raw-text/{raw_text_id}')
 async def update_raw_text(
-    raw_text_id: str,
-    payload: RawTextUpdateRequest,
+    raw_text_id: str = Path(..., description='Raw text ID'),
+    payload: RawTextUpdateRequest = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin', 'contributor')),
 ):
@@ -352,7 +352,7 @@ async def update_raw_text(
 
 @router.delete('/raw-text/{raw_text_id}')
 async def delete_raw_text(
-    raw_text_id: str,
+    raw_text_id: str = Path(..., description='Raw text ID'),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin', 'contributor')),
 ):
@@ -381,7 +381,7 @@ async def delete_raw_text(
 # Mass Submission Route
 @router.post('/submit')
 async def mass_submit(
-    payload: MassSubmissionRequest,
+    payload: MassSubmissionRequest = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin', 'contributor')),
 ):
@@ -526,7 +526,7 @@ async def get_my_drafts(
 
 @router.delete('/documents/{document_id}')
 async def delete_document(
-    document_id: str,
+    document_id: str = Path(..., description='Document ID'),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin', 'contributor')),
 ):
@@ -563,7 +563,7 @@ async def delete_document(
 
 @router.delete('/voice/{voice_sample_id}')
 async def delete_voice_sample(
-    voice_sample_id: str,
+    voice_sample_id: str = Path(..., description='Voice sample ID'),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin', 'contributor')),
 ):

@@ -22,7 +22,7 @@ class Document(Base):
     is_raw: Mapped[bool] = mapped_column(Boolean, default=False)  # True for manual data entry
     processed: Mapped[bool] = mapped_column(Boolean, default=False)  # True if OCR has been processed
     tags: Mapped[str | None] = mapped_column(Text, default=None)  # JSON string of tags
-    metadata: Mapped[str | None] = mapped_column(Text, default=None)  # JSON string of additional metadata
+    extra_metadata: Mapped[str | None] = mapped_column(Text, default=None)  # JSON string of additional metadata
 
 
 class VoiceSample(Base):
@@ -42,7 +42,7 @@ class VoiceSample(Base):
     processed: Mapped[bool] = mapped_column(Boolean, default=False)  # True if transcription has been processed
     language: Mapped[str | None] = mapped_column(String(10), default=None)  # Language code
     tags: Mapped[str | None] = mapped_column(Text, default=None)  # JSON string of tags
-    metadata: Mapped[str | None] = mapped_column(Text, default=None)  # JSON string of additional metadata
+    extra_metadata: Mapped[str | None] = mapped_column(Text, default=None)  # JSON string of additional metadata
 
 
 class RawText(Base):
@@ -59,6 +59,6 @@ class RawText(Base):
     reviewed_by_id: Mapped[str | None] = mapped_column(String(36), ForeignKey('users.id'), default=None)
     feedback: Mapped[str | None] = mapped_column(Text, default=None)
     tags: Mapped[str | None] = mapped_column(Text, default=None)  # JSON string of tags
-    metadata: Mapped[str | None] = mapped_column(Text, default=None)  # JSON string of additional metadata
+    extra_metadata: Mapped[str | None] = mapped_column(Text, default=None)  # JSON string of additional metadata
 
 

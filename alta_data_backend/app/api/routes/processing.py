@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from ...database import get_db
@@ -120,7 +120,7 @@ async def trigger_transcription(
 
 @router.get('/status/{item_id}')
 async def get_processing_status(
-    item_id: str = Query(..., description="Document or voice sample ID"),
+    item_id: str = Path(..., description="Document or voice sample ID"),
     item_type: str = Query(..., description="Type: 'document' or 'voice'"),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),

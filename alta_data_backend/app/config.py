@@ -1,9 +1,16 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+from pydantic import field_validator, computed_field
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_file='.env', 
+        env_file_encoding='utf-8', 
+        case_sensitive=False,
+        env_parse_none_str='',
+        extra='ignore'
+    )
 
     app_env: str = 'development'
     app_name: str = 'alta_data'
@@ -54,7 +61,36 @@ class Settings(BaseSettings):
     webauthn_rp_id: str = 'localhost'
     webauthn_rp_name: str = 'Alta Data'
 
-    cors_origins: List[str] = ['http://localhost:3000']
+    cors_origins_raw: str = 'http://localhost:3000'
+
+    @computed_field
+    @property
+    def cors_origins(self) -> List[str]:
+        """Parse CORS origins from string to list"""
+        v = self.cors_origins_raw
+        if isinstance(v, str):
+            if not v or v.strip() == '':
+                return ['http://localhost:3000']
+            
+            # Try to parse as JSON first (in case it's a JSON string)
+            if v.strip().startswith('[') and v.strip().endswith(']'):
+                try:
+                    import json
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [str(origin).strip() for origin in parsed if str(origin).strip()]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            
+            # If not JSON, treat as comma-separated string
+            origins = [origin.strip() for origin in v.split(',') if origin.strip()]
+            return origins if origins else ['http://localhost:3000']
+        elif isinstance(v, list):
+            # Already a list, return as is
+            return [str(origin).strip() for origin in v if str(origin).strip()]
+        else:
+            # Fallback to default
+            return ['http://localhost:3000']
 
     @property
     def database_url(self) -> str:

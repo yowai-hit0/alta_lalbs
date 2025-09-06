@@ -25,12 +25,7 @@ class BaseModel:
 Base = declarative_base(cls=BaseModel)
 
 # Import all models to ensure they're registered with SQLAlchemy
-from .models.user import User
-from .models.project import Project, ProjectMember
-from .models.data import Document, VoiceSample, RawText
-from .models.invitation import EmailVerificationToken, ProjectInvitation
-from .models.audit import AuditLog
-from .models.outbox import OutboxEvent
+# Note: These imports are moved to the end to avoid circular imports
 engine = create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
@@ -38,6 +33,9 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=As
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         yield session
+
+
+# Note: Model imports are handled in main.py to avoid circular imports
 
 
 
