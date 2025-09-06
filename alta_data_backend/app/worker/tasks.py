@@ -42,11 +42,27 @@ def task_process_ocr(self, document_id: str):
         
         document = result
         
+        # Check if Document AI service is available
+        if not document_ai_service.is_available():
+            # Mark as processed but with no OCR text
+            asyncio.run(_update_document_ocr(document_id, None))
+            
+            # Log audit event
+            asyncio.run(_log_audit_event(
+                action="DOCUMENT_OCR_SKIPPED",
+                status="warning",
+                resource_type="Document",
+                resource_id=document_id,
+                metadata={"reason": "Document AI service not available"}
+            ))
+            
+            return {"status": "skipped", "document_id": document_id, "reason": "Document AI service not available"}
+        
         # Process with Google Document AI
         ocr_text = document_ai_service.process_document(
             gcs_uri=document.gcs_uri,
-            processor_id=settings.gcs_project_id,  # Use project ID as processor ID for now
-            location="us"
+            processor_id=settings.document_ai_processor_id,
+            location=settings.document_ai_location
         )
         
         # Update document in database
@@ -94,6 +110,22 @@ def task_transcribe_audio(self, voice_sample_id: str):
         
         voice_sample = result
         
+        # Check if Speech-to-Text service is available
+        if not speech_to_text_service.is_available():
+            # Mark as processed but with no transcription
+            asyncio.run(_update_voice_sample_transcription(voice_sample_id, None, None))
+            
+            # Log audit event
+            asyncio.run(_log_audit_event(
+                action="VOICE_SAMPLE_TRANSCRIPTION_SKIPPED",
+                status="warning",
+                resource_type="VoiceSample",
+                resource_id=voice_sample_id,
+                metadata={"reason": "Speech-to-Text service not available"}
+            ))
+            
+            return {"status": "skipped", "voice_sample_id": voice_sample_id, "reason": "Speech-to-Text service not available"}
+        
         # Process with Google Speech-to-Text
         transcription_text, duration = speech_to_text_service.transcribe_audio(
             gcs_uri=voice_sample.gcs_uri,
@@ -138,18 +170,45 @@ def task_transcribe_audio(self, voice_sample_id: str):
 def task_send_email(self, to_email: str, subject: str, body: str, email_type: str = "general"):
     """Send email asynchronously"""
     try:
-        send_email(to_email, subject, body)
+        # Check if email service is available
+        from ..core.email import is_email_available
+        if not is_email_available():
+            # Log audit event for skipped email
+            asyncio.run(_log_audit_event(
+                action="EMAIL_SKIPPED",
+                status="warning",
+                resource_type="Email",
+                resource_id=None,
+                metadata={"to": to_email, "subject": subject, "type": email_type, "reason": "Email service not available"}
+            ))
+            
+            return {"status": "skipped", "to": to_email, "subject": subject, "reason": "Email service not available"}
         
-        # Log audit event
-        asyncio.run(_log_audit_event(
-            action="EMAIL_SENT",
-            status="success",
-            resource_type="Email",
-            resource_id=None,
-            metadata={"to": to_email, "subject": subject, "type": email_type}
-        ))
+        # Send email
+        success = send_email(to_email, subject, body)
         
-        return {"status": "success", "to": to_email, "subject": subject}
+        if success:
+            # Log audit event
+            asyncio.run(_log_audit_event(
+                action="EMAIL_SENT",
+                status="success",
+                resource_type="Email",
+                resource_id=None,
+                metadata={"to": to_email, "subject": subject, "type": email_type}
+            ))
+            
+            return {"status": "success", "to": to_email, "subject": subject}
+        else:
+            # Log audit event for failed email
+            asyncio.run(_log_audit_event(
+                action="EMAIL_FAILED",
+                status="failure",
+                resource_type="Email",
+                resource_id=None,
+                metadata={"to": to_email, "subject": subject, "type": email_type, "reason": "Email sending failed"}
+            ))
+            
+            return {"status": "failed", "to": to_email, "subject": subject, "reason": "Email sending failed"}
         
     except Exception as exc:
         # Log error

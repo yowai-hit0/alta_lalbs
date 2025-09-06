@@ -42,8 +42,14 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from: str = 'no-reply@altadata.local'
 
+    # Google Cloud Configuration (Optional - app will run without these)
     gcs_project_id: str | None = None
     gcs_bucket_name: str | None = None
+    google_application_credentials: str | None = None
+
+    # Document AI Configuration (Optional - app will run without these)
+    document_ai_processor_id: str | None = None
+    document_ai_location: str = 'us'
 
     webauthn_rp_id: str = 'localhost'
     webauthn_rp_name: str = 'Alta Data'

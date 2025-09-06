@@ -4,8 +4,13 @@ from sqlalchemy import text
 from datetime import datetime, timezone
 import redis
 import os
+from typing import Dict, Any
 from ...database import get_db
 from ...config import settings
+from ...core.storage import is_gcs_available
+from ...core.document_ai import document_ai_service
+from ...core.speech_to_text import speech_to_text_service
+from ...core.email import is_email_available
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -52,6 +57,40 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
                 }
             }
         )
+
+
+@router.get("/services")
+async def services_health_check():
+    """Check the availability of all external services"""
+    services_status = {
+        "google_cloud_storage": {
+            "available": is_gcs_available(),
+            "status": "available" if is_gcs_available() else "not_configured"
+        },
+        "document_ai": {
+            "available": document_ai_service.is_available(),
+            "status": "available" if document_ai_service.is_available() else "not_configured"
+        },
+        "speech_to_text": {
+            "available": speech_to_text_service.is_available(),
+            "status": "available" if speech_to_text_service.is_available() else "not_configured"
+        },
+        "email": {
+            "available": is_email_available(),
+            "status": "available" if is_email_available() else "not_configured"
+        }
+    }
+    
+    # Determine overall status
+    all_available = all(service["available"] for service in services_status.values())
+    overall_status = "all_services_available" if all_available else "some_services_unavailable"
+    
+    return {
+        "status": overall_status,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "services": services_status,
+        "message": "All services are available" if all_available else "Some services are not configured but the application will continue to run"
+    }
 
 
 @router.get("/live")

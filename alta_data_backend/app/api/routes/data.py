@@ -80,13 +80,21 @@ async def upload_document(
     if not project:
         raise HTTPException(status_code=404, detail='Project not found')
     
-    blob_path = f'documents/{project_id}/{datetime.now(timezone.utc).timestamp()}_{file.filename}'
-    bucket = settings.gcs_bucket_name or os.getenv('GCS_BUCKET_NAME', 'alta-data-local')
+    # Upload to GCS (if available) or use local storage
+    from ...core.storage import is_gcs_available
+    
+    if is_gcs_available():
+        blob_path = f'documents/{project_id}/{datetime.now(timezone.utc).timestamp()}_{file.filename}'
+        bucket = settings.gcs_bucket_name
     
     try:
         gcs_uri = upload_bytes(bucket, blob_path, content, file.content_type or 'application/octet-stream')
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Upload failed: {str(e)}')
+    else:
+        # Use local storage when GCS is not available
+        gcs_uri = f'local://documents/{project_id}/{datetime.now(timezone.utc).timestamp()}_{file.filename}'
+        # In a production environment, you might want to implement local file storage here
     
     doc = Document(
         project_id=project_id,
@@ -160,13 +168,21 @@ async def upload_voice(
     if not project:
         raise HTTPException(status_code=404, detail='Project not found')
     
-    blob_path = f'voice/{project_id}/{datetime.now(timezone.utc).timestamp()}_{file.filename}'
-    bucket = settings.gcs_bucket_name or os.getenv('GCS_BUCKET_NAME', 'alta-data-local')
+    # Upload to GCS (if available) or use local storage
+    from ...core.storage import is_gcs_available
+    
+    if is_gcs_available():
+        blob_path = f'voice/{project_id}/{datetime.now(timezone.utc).timestamp()}_{file.filename}'
+        bucket = settings.gcs_bucket_name
     
     try:
         gcs_uri = upload_bytes(bucket, blob_path, content, file.content_type or 'application/octet-stream')
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Upload failed: {str(e)}')
+    else:
+        # Use local storage when GCS is not available
+        gcs_uri = f'local://voice/{project_id}/{datetime.now(timezone.utc).timestamp()}_{file.filename}'
+        # In a production environment, you might want to implement local file storage here
     
     voice = VoiceSample(
         project_id=project_id,

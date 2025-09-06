@@ -1,14 +1,47 @@
 from google.cloud import speech
+from google.cloud.exceptions import GoogleCloudError
 from typing import Optional, Tuple
 import os
+import logging
 from ..config import settings
 
+logger = logging.getLogger(__name__)
 
 class SpeechToTextService:
     """Service for Google Speech-to-Text processing"""
     
     def __init__(self):
-        self.client = speech.SpeechClient()
+        self.client = None
+        self._available = None
+        self._initialize_client()
+    
+    def _initialize_client(self):
+        """Initialize client with error handling"""
+        try:
+            # Check if Google Cloud credentials are available
+            if not settings.gcs_project_id:
+                logger.warning("Speech-to-Text not configured: Missing GCS project ID")
+                self._available = False
+                return
+            
+            # Check if credentials file exists
+            if settings.google_application_credentials and not os.path.exists(settings.google_application_credentials):
+                logger.warning(f"Speech-to-Text not available: Credentials file not found at {settings.google_application_credentials}")
+                self._available = False
+                return
+            
+            # Initialize client
+            self.client = speech.SpeechClient()
+            self._available = True
+            logger.info("Speech-to-Text service is available and configured")
+            
+        except Exception as e:
+            logger.warning(f"Speech-to-Text not available: {str(e)}")
+            self._available = False
+    
+    def is_available(self) -> bool:
+        """Check if Speech-to-Text service is available"""
+        return self._available is True
     
     def transcribe_audio(self, gcs_uri: str, language_code: str = "en-US") -> Tuple[Optional[str], Optional[int]]:
         """
@@ -21,7 +54,16 @@ class SpeechToTextService:
         Returns:
             Tuple of (transcription_text, duration_seconds) or (None, None) if failed
         """
+        if not self.is_available():
+            logger.warning("Speech-to-Text service is not available. Cannot transcribe audio.")
+            return None, None
+        
         try:
+            # Validate GCS URI
+            if not gcs_uri.startswith('gs://'):
+                logger.error(f"Invalid GCS URI: {gcs_uri}")
+                return None, None
+            
             # Configure audio
             audio = speech.RecognitionAudio(uri=gcs_uri)
             
@@ -47,12 +89,17 @@ class SpeechToTextService:
                 # Calculate duration (approximate)
                 duration = self._estimate_duration(gcs_uri)
                 
+                logger.info(f"Successfully transcribed audio: {gcs_uri}")
                 return transcript.strip(), duration
             
+            logger.warning(f"No transcription results for audio: {gcs_uri}")
             return None, None
             
+        except GoogleCloudError as e:
+            logger.error(f"Speech-to-Text processing failed: {str(e)}")
+            return None, None
         except Exception as e:
-            print(f"Speech-to-Text processing failed: {e}")
+            logger.error(f"Unexpected error during Speech-to-Text processing: {str(e)}")
             return None, None
     
     def _get_encoding(self, gcs_uri: str) -> speech.RecognitionConfig.AudioEncoding:
