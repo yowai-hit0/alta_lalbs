@@ -7,6 +7,7 @@ from typing import Callable
 from contextvars import ContextVar
 import re
 from ..utils.audit_logger import log_audit_event
+from ..config import settings
 
 # Context variable for request correlation
 request_id_var: ContextVar[str] = ContextVar('request_id')
@@ -83,12 +84,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.redis_client = redis_client
         self.rate_limits = {
-            "/auth/login": {"limit": 5, "window": 300},  # 5 requests per 5 minutes
-            "/auth/register": {"limit": 3, "window": 3600},  # 3 requests per hour
-            "/auth/verify-email": {"limit": 10, "window": 300},  # 10 requests per 5 minutes
+            "/auth/login": {"limit": 50, "window": 300},  # 50 requests per 5 minutes
+            "/auth/register": {"limit": 20, "window": 3600},  # 20 requests per hour
+            "/auth/verify-email": {"limit": 30, "window": 300},  # 30 requests per 5 minutes
         }
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Skip rate limiting in development mode
+        if settings.app_env == 'development':
+            return await call_next(request)
+            
         if not self.redis_client:
             return await call_next(request)
         

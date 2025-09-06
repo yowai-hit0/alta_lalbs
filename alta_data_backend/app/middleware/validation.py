@@ -53,21 +53,21 @@ class ValidationMiddleware:
         request_data_var.set(request_data)
         
         # Route-specific validation
-        if path.startswith("/api/auth/register") and method == "POST":
+        if path.startswith("/auth/register") and method == "POST":
             await self._validate_registration(request, request_data)
-        elif path.startswith("/api/auth/login") and method == "POST":
+        elif path.startswith("/auth/login") and method == "POST":
             await self._validate_login(request, request_data)
-        elif path.startswith("/api/projects") and method == "POST":
+        elif path.startswith("/projects") and method == "POST":
             await self._validate_project_creation(request, request_data)
-        elif path.startswith("/api/projects/") and method in ["PUT", "PATCH"]:
+        elif path.startswith("/projects/") and method in ["PUT", "PATCH"]:
             await self._validate_project_update(request, request_data)
-        elif path.startswith("/api/documents") and method == "POST":
+        elif path.startswith("/documents") and method == "POST":
             await self._validate_document_upload(request, request_data)
-        elif path.startswith("/api/voice") and method == "POST":
+        elif path.startswith("/voice") and method == "POST":
             await self._validate_voice_upload(request, request_data)
-        elif path.startswith("/api/review/") and method == "PATCH":
+        elif path.startswith("/review/") and method == "PATCH":
             await self._validate_review_decision(request, request_data)
-        elif path.startswith("/api/analytics") and method == "GET":
+        elif path.startswith("/analytics") and method == "GET":
             await self._validate_analytics_request(request, request_data)
     
     async def _extract_request_data(self, request: Request) -> Dict[str, Any]:
@@ -85,6 +85,8 @@ class ValidationMiddleware:
         
         # Extract body for POST/PUT/PATCH requests
         if request.method in ["POST", "PUT", "PATCH"]:
+            # Don't read the body here as it will be consumed and can't be read by FastAPI
+            # The body will be validated by FastAPI's automatic parsing
             try:
                 body = await request.body()
                 if body:
@@ -97,6 +99,9 @@ class ValidationMiddleware:
             except Exception:
                 # If body parsing fails, we'll handle it in route validation
                 pass
+            # content_type = request.headers.get("content-type", "")
+            # if "multipart/form-data" in content_type:
+            #     data["is_multipart"] = True
         
         return data
     

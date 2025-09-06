@@ -30,7 +30,7 @@ class ErrorResponse(BaseModel):
     """Centralized error response schema"""
     error: "ErrorInfo" = Field(..., description="Error information")
     request_id: Optional[str] = Field(None, description="Request correlation ID")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat(), description="Error timestamp")
     path: Optional[str] = Field(None, description="API path where error occurred")
     method: Optional[str] = Field(None, description="HTTP method")
 

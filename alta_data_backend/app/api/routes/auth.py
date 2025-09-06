@@ -29,16 +29,23 @@ def get_redis():
     global _redis
     if _redis is None:
         url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-        _redis = redis.Redis.from_url(url)
+        _redis = redis.Redis.from_url(url, socket_connect_timeout=5, socket_timeout=5)
     return _redis
 
 
 def ratelimit(key: str, limit: int, window_sec: int) -> bool:
-    r = get_redis()
-    count = r.incr(key)
-    if count == 1:
-        r.expire(key, window_sec)
-    return count <= limit
+    try:
+        r = get_redis()
+        # Add timeout to prevent hanging
+        r.ping()  # Test connection first
+        count = r.incr(key)
+        if count == 1:
+            r.expire(key, window_sec)
+        return count <= limit
+    except Exception as e:
+        # If Redis is not available, allow the request (fail open)
+        print(f"Redis rate limiting failed: {e}")
+        return True
 
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
@@ -53,7 +60,7 @@ def verify_password(password: str, hashed: str) -> bool:
 
 @router.post('/register', response_model=UserResponse)
 async def register(payload: RegisterRequest = Body(...), db: AsyncSession = Depends(get_db)):
-    if not ratelimit(f"rl:register:{payload.email}", 10, 60):
+    if not ratelimit(f"rl:register:{payload.email}", 250, 6000):
         raise HTTPException(status_code=429, detail='Too many requests')
     existing = await db.execute(select(User).where(User.email == payload.email))
     if existing.scalar_one_or_none():

@@ -17,21 +17,21 @@ class Settings(BaseSettings):
     secret_key: str = 'changeme'
     jwt_alg: str = 'HS256'
 
-    postgres_host: str = 'localhost'
+    postgres_host: str = 'db'
     postgres_port: int = 5432
     postgres_db: str = 'alta_data'
     postgres_user: str = 'postgres'
     postgres_password: str = 'postgres'
 
     # Redis Configuration (for caching, rate limiting, sessions)
-    redis_url: str = 'redis://localhost:6379/0'
-    redis_host: str = 'localhost'
+    redis_url: str = 'redis://redis:6379/0'
+    redis_host: str = 'redis'
     redis_port: int = 6379
     redis_db: int = 0
 
     # RabbitMQ Configuration (for background processing)
-    rabbitmq_url: str = 'amqp://guest:guest@localhost:5672//'
-    rabbitmq_host: str = 'localhost'
+    rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672//'
+    rabbitmq_host: str = 'rabbitmq'
     rabbitmq_port: int = 5672
     rabbitmq_user: str = 'guest'
     rabbitmq_password: str = 'guest'
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     # Outbox Pattern Configuration
     outbox_batch_size: int = 100
-    outbox_processing_interval: int = 20  # seconds
+    outbox_processing_interval: int = 5  # seconds
     outbox_max_retries: int = 3
     outbox_retry_delay: int = 60  # seconds
 
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     webauthn_rp_id: str = 'localhost'
     webauthn_rp_name: str = 'Alta Data'
 
-    cors_origins_raw: str = 'http://localhost:3000'
+    cors_origins_raw: str = 'http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000'
 
     @computed_field
     @property

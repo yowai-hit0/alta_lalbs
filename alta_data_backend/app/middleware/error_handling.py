@@ -90,7 +90,7 @@ async def alta_data_exception_handler(request: Request, exc: AltaDataException) 
     })
     
     # Log audit event
-    await log_audit_event(
+    log_audit_event(
         action="API_ERROR",
         status="failure",
         resource_type="API",
@@ -222,7 +222,7 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError) -
     }, exc_info=True)
     
     # Log audit event
-    await log_audit_event(
+    log_audit_event(
         action="DATABASE_ERROR",
         status="failure",
         resource_type="Database",
@@ -267,7 +267,7 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
     }, exc_info=True)
     
     # Log audit event
-    await log_audit_event(
+    log_audit_event(
         action="UNHANDLED_ERROR",
         status="failure",
         resource_type="API",

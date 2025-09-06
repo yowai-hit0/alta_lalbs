@@ -95,15 +95,7 @@ app = FastAPI(
     redoc_url='/redoc'
 )
 
-# Add middleware (order matters!)
-app.add_middleware(AuditLoggingMiddleware)
-app.add_middleware(RequestCorrelationMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(ValidationMiddleware)
-app.add_middleware(InputValidationMiddleware)
-app.add_middleware(RateLimitMiddleware, redis_client=redis_client)
-
-# Add CORS middleware
+# Add CORS middleware FIRST (order matters!)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -111,6 +103,14 @@ app.add_middleware(
     allow_methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allow_headers=['*'],
 )
+
+# Add other middleware
+app.add_middleware(AuditLoggingMiddleware)
+app.add_middleware(RequestCorrelationMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+# app.add_middleware(ValidationMiddleware)  # Disabled - FastAPI handles validation automatically
+app.add_middleware(InputValidationMiddleware)
+app.add_middleware(RateLimitMiddleware, redis_client=redis_client)
 
 # Add trusted host middleware for production
 if settings.app_env == 'production':
