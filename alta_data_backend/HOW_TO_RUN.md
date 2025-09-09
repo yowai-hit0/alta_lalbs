@@ -8,6 +8,8 @@ docker-compose down //stops the services (ddo this everytime before you run the 
 docker-compose logs <service-name> //show the logs for the service running ex:  docker-compose logs worker-email or  docker-compose logs api
 
 
+hehehehe
+
 ## 🎯 Quick Start (Minimal Setup)
 
 ### **Prerequisites**
