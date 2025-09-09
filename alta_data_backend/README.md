@@ -1,121 +1,405 @@
-# Alta Data Backend
+# Alta Data Backend - Complete System Documentation
 
-A comprehensive FastAPI-based backend for the Alta Data platform, designed for collection, annotation, and labeling of text and audio data with robust role-based access control, background processing, and analytics capabilities.
+## Table of Contents
+1. [Project Overview](#project-overview)
+2. [System Architecture](#system-architecture)
+3. [Technology Stack](#technology-stack)
+4. [User Roles & Permissions](#user-roles--permissions)
+5. [Data Models](#data-models)
+6. [API Documentation](#api-documentation)
+7. [Background Processing](#background-processing)
+8. [Deployment & Infrastructure](#deployment--infrastructure)
+9. [Security Features](#security-features)
+10. [Monitoring & Observability](#monitoring--observability)
 
-## 🏗️ Architecture Overview
+---
 
-- **Framework**: FastAPI (async-first)
-- **Database**: PostgreSQL with SQLAlchemy 2.0 + Alembic migrations
-- **Authentication**: JWT with email verification
-- **Message Queue**: RabbitMQ for reliable background processing
-- **Cache**: Redis for rate limiting, sessions, and Celery result backend
-- **Object Storage**: Google Cloud Storage (GCS)
-- **Background Processing**: Celery workers with outbox pattern
-- **External AI Services**: Google Document AI (OCR), Google Speech-to-Text
-- **Logging**: Structlog with JSON formatting and request correlation
-- **Email**: SMTP for transactional emails
+## Project Overview
 
-## 🔄 Project Flow & Workflow
+**Alta Data Backend** is a comprehensive FastAPI-based platform designed for collection, annotation, and labeling of text and audio data. The system provides robust role-based access control, background processing capabilities, and analytics for managing data workflows from acquisition to high-quality dataset creation.
 
-### **1. User Registration & Authentication**
+### Key Features
+- **Multi-format Data Support**: Documents (PDF, images), Voice samples (audio files), and Raw text entries
+- **AI-Powered Processing**: Google Document AI for OCR and Google Speech-to-Text for transcription
+- **Role-Based Access Control**: Granular permissions for different user types
+- **Background Processing**: Reliable message queuing with the Outbox pattern
+- **Review Workflow**: Comprehensive approval/rejection system for data quality
+- **Analytics Dashboard**: Detailed metrics and reporting capabilities
+- **Audit Logging**: Complete audit trail for compliance and security
 
-```mermaid
-graph TD
-    A[User Registration] --> B[Email Verification Required]
-    B --> C[Email Sent via RabbitMQ]
-    C --> D[User Clicks Verification Link]
-    D --> E[Account Activated]
-    E --> F[User Can Login]
-    F --> G[JWT Token Issued]
+---
+
+## System Architecture
+
+### High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Client Requests                         │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────────┐
+│                    FastAPI Application                         │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │   Auth Routes   │  │  Project Routes │  │   Data Routes   │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │  Review Routes  │  │ Analytics Routes│  │  Health Routes  │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────────┐
+│                    Middleware Layer                            │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │ Security Headers│  │ Request Correl. │  │  Rate Limiting  │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │ Input Validation│  │  Audit Logging  │  │ Error Handling  │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────────┐
+│                    Service Layer                               │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │  Outbox Service │  │ Document AI Svc │  │ Speech-to-Text  │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │   Email Service │  │  Storage Service│  │  Audit Service  │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────────┐
+│                    Data Layer                                  │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │   PostgreSQL    │  │     Redis       │  │    RabbitMQ     │ │
+│  │                 │  │                 │  │                 │ │
+│  │ • Main Database │  │ • Rate Limiting │  │ • OCR Queue     │ │
+│  │ • Audit Logs    │  │ • Caching       │  │ • Email Queue   │ │
+│  │ • Outbox Events │  │ • Sessions      │  │ • Trans. Queue  │ │
+│  │ • User Data     │  │ • Celery Results│  │ • Dead Letters  │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────────┐
+│                Background Processing                           │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │  OCR Worker     │  │Transcription Wkr│  │  Email Worker   │ │
+│  │  (Celery)       │  │   (Celery)      │  │   (Celery)      │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │ Outbox Processor│  │  Celery Beat    │  │  Flower Monitor │ │
+│  │   (Async)       │  │  (Scheduler)    │  │   (Web UI)      │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### **2. Project Creation & Management**
+### Data Flow
 
-```mermaid
-graph TD
-    A[User Creates Project] --> B[Becomes Project Admin]
-    B --> C[Invite Contributors/Reviewers]
-    C --> D[Email Invitations Sent]
-    D --> E[Users Accept Invitations]
-    E --> F[Project Team Formed]
+1. **File Upload Flow**:
+   ```
+   Client → FastAPI → Outbox Service → PostgreSQL
+                   ↓
+           Outbox Processor → RabbitMQ → Celery Worker → Google Cloud AI
+   ```
+
+2. **Email Sending Flow**:
+   ```
+   User Registration → Outbox Service → PostgreSQL
+                           ↓
+                   Outbox Processor → RabbitMQ → Email Worker → SMTP
+   ```
+
+3. **Rate Limiting Flow**:
+   ```
+   Client Request → Rate Limit Middleware → Redis → Allow/Deny
+   ```
+
+---
+
+## Technology Stack
+
+### Core Framework
+- **FastAPI**: Modern, fast web framework for building APIs with Python 3.11+
+- **Uvicorn**: ASGI server for running FastAPI applications
+- **Pydantic**: Data validation and settings management using Python type annotations
+
+### Database & ORM
+- **PostgreSQL 15+**: Primary relational database for data persistence
+- **SQLAlchemy 2.0**: Modern Python SQL toolkit and ORM with async support
+- **AsyncPG**: High-performance PostgreSQL driver for Python
+- **Alembic**: Database migration tool for SQLAlchemy
+
+### Authentication & Security
+- **JWT (python-jose)**: JSON Web Token implementation for stateless authentication
+- **Passlib**: Password hashing utilities (bcrypt)
+- **WebAuthn**: Passwordless authentication support (planned)
+
+### Caching & Message Queuing
+- **Redis 7+**: In-memory data structure store for caching, rate limiting, and session storage
+- **RabbitMQ 3.12+**: Message broker for reliable background processing
+- **Celery**: Distributed task queue for background job processing
+
+### Cloud Services
+- **Google Cloud Storage**: Object storage for uploaded files
+- **Google Document AI**: OCR processing for document text extraction
+- **Google Speech-to-Text**: Audio transcription services
+
+### Background Processing
+- **Celery**: Asynchronous task queue with Redis/RabbitMQ backend
+- **Flower**: Web-based tool for monitoring Celery clusters
+- **Outbox Pattern**: Reliable message delivery pattern for data consistency
+
+### Development & Deployment
+- **Docker & Docker Compose**: Containerization and orchestration
+- **Structlog**: Structured logging with JSON formatting
+- **Email-validator**: Email validation utilities
+- **Jinja2**: Template engine for email templates
+
+### Monitoring & Observability
+- **Health Checks**: Built-in health monitoring endpoints
+- **Request Correlation**: Unique request IDs for tracing
+- **Audit Logging**: Comprehensive audit trail for all operations
+- **Rate Limiting**: Redis-based request throttling
+
+---
+
+## User Roles & Permissions
+
+### 1. Super Admin (`super_admin`)
+**Global Platform Access**
+
+**Capabilities:**
+- Unrestricted access to all platform features and data
+- Manage user accounts, roles, and system-wide configurations
+- Create, view, update, and delete any project
+- Access global analytics dashboards
+- View and manage all documents and voice samples across projects
+- System administration and maintenance
+
+**API Access:**
+- All endpoints with full permissions
+- Global analytics: `GET /api/analytics/summary`
+- User management: `GET /api/admin/users`
+
+### 2. Project Manager (`admin` at project level)
+**Project-Level Administration**
+
+**Capabilities:**
+- Full control over projects they create or are assigned to as admin
+- Create new projects (becomes default admin)
+- Invite users to projects and assign roles (contributor/reviewer)
+- Upload documents and data to their projects
+- Access review workflows to approve/reject submissions
+- View project-specific analytics
+- Modify project settings and configurations
+
+**API Access:**
+- Project management: `POST /api/projects`, `PUT /api/projects/{id}`
+- User invitations: `POST /api/projects/{id}/invite`
+- Review management: `GET /api/review`, `PATCH /api/review/{id}`
+- Project analytics: `GET /api/analytics/summary?projectId={id}`
+
+### 3. Contributor (`contributor` at project level)
+**Data Contribution**
+
+**Capabilities:**
+- Upload files (documents, voice samples) to assigned projects
+- Create raw text entries (manual data entry)
+- CRUD operations on their own draft data
+- Submit data for review
+- Mass submission of multiple items
+- View their own contribution history
+
+**Restrictions:**
+- Cannot see other contributors' draft data
+- Cannot delete submitted data
+- Cannot access review queue
+- Cannot modify project settings
+
+**API Access:**
+- Data upload: `POST /api/documents`, `POST /api/voice`, `POST /api/raw-text`
+- Draft management: `GET /api/my-drafts`
+- Data submission: `POST /api/submit`
+- Data updates: `PUT /api/documents/{id}`, `PUT /api/raw-text/{id}`
+
+### 4. Reviewer (`reviewer` at project level)
+**Quality Assurance**
+
+**Capabilities:**
+- Access review queue for assigned projects
+- Approve, reject, or provide feedback on submissions
+- Read-only access to all submitted data
+- View review statistics and metrics
+
+**Restrictions:**
+- Cannot upload data
+- Cannot modify project settings
+- Cannot access draft data from contributors
+- Cannot modify data content
+
+**API Access:**
+- Review queue: `GET /api/review?project_id={id}`
+- Review decisions: `PATCH /api/review/{id}`
+- Review analytics: `GET /api/analytics/review`
+
+---
+
+## Data Models
+
+### Core Entities
+
+#### User Model
+```python
+{
+  "id": "uuid",
+  "email": "string (unique)",
+  "hashed_password": "string",
+  "is_verified": "boolean",
+  "global_role": "string (user|super_admin)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
 ```
 
-### **3. Data Upload & Processing Workflow**
-
-```mermaid
-graph TD
-    A[Contributor Uploads File] --> B{File Type?}
-    B -->|Document| C[Upload to GCS]
-    B -->|Voice| D[Upload to GCS]
-    B -->|Raw Text| E[Store in Database]
-    
-    C --> F{Is Raw?}
-    F -->|Yes| G[Mark as Processed]
-    F -->|No| H[Trigger OCR via RabbitMQ]
-    
-    D --> I[Trigger Transcription via RabbitMQ]
-    E --> J[Ready for Submission]
-    G --> J
-    H --> K[OCR Processing]
-    I --> L[Transcription Processing]
-    K --> J
-    L --> J
-    
-    J --> M[Contributor Submits for Review]
-    M --> N[Status: Pending Review]
-    N --> O[Reviewer Reviews]
-    O --> P{Decision}
-    P -->|Approve| Q[Status: Approved]
-    P -->|Reject| R[Status: Rejected]
+#### Project Model
+```python
+{
+  "id": "uuid",
+  "name": "string",
+  "description": "string",
+  "created_by_id": "uuid (FK to User)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
 ```
 
-### **4. Background Processing with Outbox Pattern**
-
-```mermaid
-graph TD
-    A[API Request] --> B[Create Outbox Event]
-    B --> C[Commit to Database]
-    C --> D[Outbox Processor Polls Every 5s]
-    D --> E[Publish to RabbitMQ]
-    E --> F[Celery Worker Processes]
-    F --> G[Update Database]
-    G --> H[Mark Event Complete]
+#### ProjectMember Model
+```python
+{
+  "id": "uuid",
+  "project_id": "uuid (FK to Project)",
+  "user_id": "uuid (FK to User)",
+  "role": "string (admin|contributor|reviewer)",
+  "created_at": "datetime"
+}
 ```
 
-## 👥 User Roles & Permissions
+### Data Collection Models
 
-### **Project Admin (Owner)**
-- ✅ Create and manage projects
-- ✅ Invite users as contributors or reviewers
-- ✅ Upload and manage all data types
-- ✅ Access review queue and approve/reject submissions
-- ✅ Modify project settings
-- ✅ Delete projects
+#### Document Model
+```python
+{
+  "id": "uuid",
+  "project_id": "uuid (FK to Project)",
+  "uploaded_by_id": "uuid (FK to User)",
+  "original_filename": "string",
+  "gcs_uri": "string",
+  "ocr_text": "text (nullable)",
+  "status": "string (draft|pending_review|approved|rejected)",
+  "domain": "string (nullable)",
+  "submitted_at": "datetime (nullable)",
+  "reviewed_by_id": "uuid (FK to User, nullable)",
+  "feedback": "text (nullable)",
+  "is_raw": "boolean",
+  "processed": "boolean",
+  "tags": "json (nullable)",
+  "extra_metadata": "json (nullable)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
 
-### **Contributors**
-- ✅ Upload files (documents, voice samples)
-- ✅ Create raw text entries (manual data entry)
-- ✅ CRUD operations on their own draft data
-- ✅ Submit data for review
-- ✅ Mass submission of multiple items
-- ❌ Cannot see other contributors' draft data
-- ❌ Cannot delete submitted data
-- ❌ Cannot access review queue
-- ❌ Cannot modify project settings
+#### VoiceSample Model
+```python
+{
+  "id": "uuid",
+  "project_id": "uuid (FK to Project)",
+  "uploaded_by_id": "uuid (FK to User)",
+  "original_filename": "string",
+  "gcs_uri": "string",
+  "transcription_text": "text (nullable)",
+  "status": "string (draft|pending_review|approved|rejected)",
+  "duration_seconds": "integer (nullable)",
+  "submitted_at": "datetime (nullable)",
+  "reviewed_by_id": "uuid (FK to User, nullable)",
+  "feedback": "text (nullable)",
+  "processed": "boolean",
+  "language": "string (nullable)",
+  "tags": "json (nullable)",
+  "extra_metadata": "json (nullable)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
 
-### **Reviewers**
-- ✅ Access review queue for assigned projects
-- ✅ Approve, reject, or provide feedback on submissions
-- ✅ Read-only access to all submitted data
-- ❌ Cannot upload data
-- ❌ Cannot modify project settings
-- ❌ Cannot access draft data from contributors
+#### RawText Model
+```python
+{
+  "id": "uuid",
+  "project_id": "uuid (FK to Project)",
+  "created_by_id": "uuid (FK to User)",
+  "title": "string",
+  "content": "text",
+  "status": "string (draft|pending_review|approved|rejected)",
+  "domain": "string (nullable)",
+  "submitted_at": "datetime (nullable)",
+  "reviewed_by_id": "uuid (FK to User, nullable)",
+  "feedback": "text (nullable)",
+  "tags": "json (nullable)",
+  "extra_metadata": "json (nullable)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
 
-## 📊 API Endpoints & Usage
+### System Models
 
-### **Authentication APIs**
+#### OutboxEvent Model (Outbox Pattern)
+```python
+{
+  "id": "uuid",
+  "event_type": "string",
+  "aggregate_id": "string",
+  "aggregate_type": "string",
+  "payload": "json",
+  "status": "string (pending|processing|completed|failed)",
+  "retry_count": "integer",
+  "max_retries": "integer",
+  "last_attempt_at": "datetime (nullable)",
+  "error_message": "text (nullable)",
+  "processed_at": "datetime (nullable)",
+  "created_at": "datetime"
+}
+```
 
-#### **User Registration**
+#### AuditLog Model
+```python
+{
+  "id": "uuid",
+  "actor_user_id": "uuid (FK to User, nullable)",
+  "action": "string",
+  "resource_type": "string",
+  "resource_id": "string",
+  "status": "string (success|failure)",
+  "ip_address": "string",
+  "user_agent": "string",
+  "metadata": "json",
+  "created_at": "datetime"
+}
+```
+
+---
+
+## API Documentation
+
+### Base URL
+```
+http://localhost:8000/api
+```
+
+### Authentication Endpoints
+
+#### User Registration
 ```http
 POST /api/auth/register
 Content-Type: application/json
@@ -134,7 +418,7 @@ Response:
 }
 ```
 
-#### **User Login**
+#### User Login
 ```http
 POST /api/auth/login
 Content-Type: application/json
@@ -150,19 +434,33 @@ Response:
 }
 ```
 
-#### **Email Verification**
+#### Email Verification
 ```http
 GET /api/auth/verify-email?token=verification-token
 
 Response:
 {
-  "message": "Email verified successfully"
+  "verified": true
 }
 ```
 
-### **Project Management APIs**
+#### Get Current User
+```http
+GET /api/auth/me
+Authorization: Bearer jwt-token
 
-#### **Create Project**
+Response:
+{
+  "id": "user-uuid",
+  "email": "user@example.com",
+  "is_verified": true,
+  "global_role": "user"
+}
+```
+
+### Project Management Endpoints
+
+#### Create Project
 ```http
 POST /api/projects
 Authorization: Bearer jwt-token
@@ -182,7 +480,68 @@ Response:
 }
 ```
 
-#### **Invite User to Project**
+#### List Projects
+```http
+GET /api/projects
+Authorization: Bearer jwt-token
+
+Response:
+[
+  {
+    "id": "project-uuid",
+    "name": "My Research Project",
+    "description": "Project for collecting research data",
+    "created_by_id": "user-uuid"
+  }
+]
+```
+
+#### Get Project Details
+```http
+GET /api/projects/{project_id}
+Authorization: Bearer jwt-token
+
+Response:
+{
+  "id": "project-uuid",
+  "name": "My Research Project",
+  "description": "Project for collecting research data",
+  "created_by_id": "user-uuid"
+}
+```
+
+#### Update Project
+```http
+PUT /api/projects/{project_id}
+Authorization: Bearer jwt-token
+Content-Type: application/json
+
+{
+  "name": "Updated Project Name",
+  "description": "Updated description"
+}
+
+Response:
+{
+  "id": "project-uuid",
+  "name": "Updated Project Name",
+  "description": "Updated description",
+  "created_by_id": "user-uuid"
+}
+```
+
+#### Delete Project
+```http
+DELETE /api/projects/{project_id}
+Authorization: Bearer jwt-token
+
+Response:
+{
+  "deleted": true
+}
+```
+
+#### Invite User to Project
 ```http
 POST /api/projects/{project_id}/invite
 Authorization: Bearer jwt-token
@@ -200,20 +559,21 @@ Response:
 }
 ```
 
-#### **Accept Project Invitation**
+#### Accept Project Invitation
 ```http
 POST /api/projects/invitations/{token}/accept
 Authorization: Bearer jwt-token
 
 Response:
 {
-  "message": "Invitation accepted successfully"
+  "accepted": true,
+  "projectId": "project-uuid"
 }
 ```
 
-### **Data Upload APIs**
+### Data Upload Endpoints
 
-#### **Upload Document**
+#### Upload Document
 ```http
 POST /api/documents?project_id={project_id}&is_raw=false
 Authorization: Bearer jwt-token
@@ -231,7 +591,7 @@ Response:
 }
 ```
 
-#### **Upload Voice Sample**
+#### Upload Voice Sample
 ```http
 POST /api/voice?project_id={project_id}
 Authorization: Bearer jwt-token
@@ -248,7 +608,7 @@ Response:
 }
 ```
 
-#### **Create Raw Text Entry**
+#### Create Raw Text Entry
 ```http
 POST /api/raw-text
 Authorization: Bearer jwt-token
@@ -271,9 +631,9 @@ Response:
 }
 ```
 
-### **Draft Management APIs**
+### Draft Management Endpoints
 
-#### **Get My Drafts**
+#### Get My Drafts
 ```http
 GET /api/my-drafts?project_id={project_id}
 Authorization: Bearer jwt-token
@@ -310,7 +670,7 @@ Response:
 }
 ```
 
-#### **Update Document**
+#### Update Document
 ```http
 PUT /api/documents/{document_id}
 Authorization: Bearer jwt-token
@@ -328,7 +688,7 @@ Response:
 }
 ```
 
-#### **Delete Document (Draft Only)**
+#### Delete Document (Draft Only)
 ```http
 DELETE /api/documents/{document_id}
 Authorization: Bearer jwt-token
@@ -340,9 +700,9 @@ Response:
 }
 ```
 
-### **Mass Submission API**
+### Mass Submission Endpoints
 
-#### **Submit Multiple Items for Review**
+#### Submit Multiple Items for Review
 ```http
 POST /api/submit
 Authorization: Bearer jwt-token
@@ -367,9 +727,9 @@ Response:
 }
 ```
 
-### **Processing APIs**
+### Processing Endpoints
 
-#### **Manual OCR Trigger**
+#### Manual OCR Trigger
 ```http
 POST /api/processing/ocr?document_id={document_id}
 Authorization: Bearer jwt-token
@@ -382,7 +742,7 @@ Response:
 }
 ```
 
-#### **Manual Transcription Trigger**
+#### Manual Transcription Trigger
 ```http
 POST /api/processing/transcribe?voice_sample_id={voice_sample_id}
 Authorization: Bearer jwt-token
@@ -395,7 +755,7 @@ Response:
 }
 ```
 
-#### **Batch OCR Processing**
+#### Batch OCR Processing
 ```http
 POST /api/processing/batch-ocr?document_ids=["doc1","doc2","doc3"]
 Authorization: Bearer jwt-token
@@ -411,7 +771,7 @@ Response:
 }
 ```
 
-#### **Check Processing Status**
+#### Check Processing Status
 ```http
 GET /api/processing/status/{item_id}?item_type=document
 Authorization: Bearer jwt-token
@@ -426,9 +786,9 @@ Response:
 }
 ```
 
-### **Review APIs**
+### Review Endpoints
 
-#### **Get Review Queue**
+#### Get Review Queue
 ```http
 GET /api/review?project_id={project_id}
 Authorization: Bearer jwt-token
@@ -462,7 +822,7 @@ Response:
 ]
 ```
 
-#### **Review Decision**
+#### Review Decision
 ```http
 PATCH /api/review/{item_id}?item_type=document
 Authorization: Bearer jwt-token
@@ -483,9 +843,9 @@ Response:
 }
 ```
 
-### **Analytics APIs**
+### Analytics Endpoints
 
-#### **Project Analytics**
+#### Project Analytics
 ```http
 GET /api/analytics/summary?timeframe=7d&project_id={project_id}
 Authorization: Bearer jwt-token
@@ -504,7 +864,28 @@ Response:
 }
 ```
 
-#### **User Analytics**
+#### Global Analytics (Super Admin Only)
+```http
+GET /api/analytics/summary?timeframe=30d
+Authorization: Bearer jwt-token
+
+Response:
+{
+  "totalUsers": 150,
+  "totalProjects": 25,
+  "documentCounts": {
+    "approved": 1200,
+    "pending_review": 45,
+    "rejected": 12
+  },
+  "userSignupDaily": [
+    {"day": "2024-01-15", "count": 5},
+    {"day": "2024-01-16", "count": 8}
+  ]
+}
+```
+
+#### User Analytics
 ```http
 GET /api/analytics/user/{user_id}?timeframe=30d
 Authorization: Bearer jwt-token
@@ -520,179 +901,345 @@ Response:
 }
 ```
 
-## 🔧 Background Workers & Processing
+### Health Check Endpoints
 
-### **Outbox Processor**
-- **Polling Frequency**: Every 5 seconds
-- **Batch Size**: Up to 100 events per batch
-- **Retry Logic**: Up to 3 retries with 60-second delay
-- **Event Types**: OCR, transcription, email sending
+#### Basic Health Check
+```http
+GET /api/health
 
-### **Celery Workers**
-- **OCR Worker**: Processes documents with Google Document AI
-- **Transcription Worker**: Processes audio with Google Speech-to-Text
-- **Email Worker**: Sends transactional emails
-- **Queue Management**: Separate queues for different task types
-
-### **Processing Flow**
-1. **API Request** → Create outbox event in database
-2. **Outbox Processor** → Polls every 5 seconds for pending events
-3. **RabbitMQ** → Publishes events to appropriate Celery queues
-4. **Celery Workers** → Process tasks and update database
-5. **Status Update** → Mark events as completed or failed
-
-## 🚀 Quick Start
-
-### **Prerequisites**
-- Python 3.11+
-- PostgreSQL 15+
-- Redis 7+
-- RabbitMQ 3.12+
-- Google Cloud Storage bucket
-- Google Cloud credentials for Document AI and Speech-to-Text
-
-### **Installation**
-
-1. **Clone and setup environment:**
-```bash
-cd alta_data_backend
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-2. **Environment configuration:**
-Copy `env.example` to `.env` and configure:
-```bash
-cp env.example .env
-# Edit .env with your configuration
-```
-
-3. **Start with Docker Compose:**
-```bash
-# Start all services
-./start.sh
-
-# Or manually
-docker-compose up --build -d
-```
-
-4. **Run migrations:**
-```bash
-docker-compose exec api alembic upgrade head
-```
-
-### **Access Points**
-- **API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
-- **RabbitMQ Management**: http://localhost:15672 (guest/guest)
-- **Flower (Celery Monitor)**: http://localhost:5555
-
-## 📊 Data Models
-
-### **Document Model**
-```python
+Response:
 {
-  "id": "uuid",
-  "project_id": "uuid",
-  "uploaded_by_id": "uuid",
-  "original_filename": "string",
-  "gcs_uri": "string",
-  "ocr_text": "string | null",
-  "status": "draft | pending_review | approved | rejected",
-  "domain": "string | null",
-  "submitted_at": "datetime | null",
-  "reviewed_by_id": "uuid | null",
-  "feedback": "string | null",
-  "is_raw": "boolean",
-  "processed": "boolean",
-  "tags": "json | null",
-  "metadata": "json | null"
+  "status": "healthy",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "services": {
+    "database": "healthy",
+    "redis": "healthy",
+    "rabbitmq": "healthy"
+  }
 }
 ```
 
-### **Voice Sample Model**
-```python
+#### Readiness Check
+```http
+GET /api/health/ready
+
+Response:
 {
-  "id": "uuid",
-  "project_id": "uuid",
-  "uploaded_by_id": "uuid",
-  "original_filename": "string",
-  "gcs_uri": "string",
-  "transcription_text": "string | null",
-  "status": "draft | pending_review | approved | rejected",
-  "duration_seconds": "integer | null",
-  "submitted_at": "datetime | null",
-  "reviewed_by_id": "uuid | null",
-  "feedback": "string | null",
-  "processed": "boolean",
-  "language": "string | null",
-  "tags": "json | null",
-  "metadata": "json | null"
+  "status": "ready",
+  "timestamp": "2024-01-15T10:30:00Z"
 }
 ```
 
-### **Raw Text Model**
-```python
+#### Liveness Check
+```http
+GET /api/health/live
+
+Response:
 {
-  "id": "uuid",
-  "project_id": "uuid",
-  "created_by_id": "uuid",
-  "title": "string",
-  "content": "string",
-  "status": "draft | pending_review | approved | rejected",
-  "domain": "string | null",
-  "submitted_at": "datetime | null",
-  "reviewed_by_id": "uuid | null",
-  "feedback": "string | null",
-  "tags": "json | null",
-  "metadata": "json | null"
+  "status": "alive",
+  "timestamp": "2024-01-15T10:30:00Z"
 }
 ```
-
-## 🔒 Security Features
-
-- **JWT Authentication** with email verification
-- **Role-based access control** (RBAC)
-- **Rate limiting** with Redis
-- **Input validation** with Pydantic
-- **Request correlation** for tracing
-- **Audit logging** for all operations
-- **CORS protection** with configurable origins
-- **Security headers** middleware
-- **File upload validation** (type, size, content)
-
-## 📈 Monitoring & Observability
-
-- **Structured logging** with JSON format
-- **Request correlation IDs** for tracing
-- **Health check endpoints** for all services
-- **Audit trail** for all user actions
-- **Performance metrics** via Flower
-- **Error tracking** with detailed context
-
-## 🎯 Key Features
-
-1. **✅ Complete Role-Based Access Control**
-2. **✅ Multi-format Data Support** (Documents, Voice, Raw Text)
-3. **✅ Background Processing** with reliable message delivery
-4. **✅ Draft Management** with ownership validation
-5. **✅ Mass Operations** for efficient bulk processing
-6. **✅ Review Workflow** with unified queue
-7. **✅ File Management** with GCS integration
-8. **✅ Processing Control** (automatic and manual)
-9. **✅ Analytics & Reporting** with multiple timeframes
-10. **✅ Production-Ready** with comprehensive error handling
-
-## 📄 License
-
-[Add your license information here]
-
-## 🆘 Support
-
-For support and questions:
-- Create an issue in the repository
-- Contact the development team
-- Check the API documentation at `/docs`
 
 ---
+
+## Background Processing
+
+### Outbox Pattern Implementation
+
+The system uses the **Outbox Pattern** to ensure reliable message delivery and data consistency:
+
+1. **Event Creation**: Business events are stored in the `outbox_events` table within the same database transaction
+2. **Event Processing**: The outbox processor polls every 5 seconds for pending events
+3. **Message Publishing**: Events are published to appropriate RabbitMQ queues
+4. **Worker Processing**: Celery workers process tasks and update the database
+5. **Status Tracking**: Events are marked as completed or failed with retry logic
+
+### Celery Workers
+
+#### OCR Worker
+- **Queue**: `ocr_queue`
+- **Task**: `task_process_ocr`
+- **Function**: Processes documents with Google Document AI
+- **Retry Logic**: Up to 3 retries with exponential backoff
+
+#### Transcription Worker
+- **Queue**: `transcription_queue`
+- **Task**: `task_transcribe_audio`
+- **Function**: Transcribes audio with Google Speech-to-Text
+- **Retry Logic**: Up to 3 retries with exponential backoff
+
+#### Email Worker
+- **Queue**: `email_queue`
+- **Task**: `task_send_email`
+- **Function**: Sends transactional emails via SMTP
+- **Retry Logic**: Up to 3 retries with exponential backoff
+
+### Processing Flow
+
+1. **File Upload** → Create outbox event → Store in database
+2. **Outbox Processor** → Polls every 5 seconds → Publishes to RabbitMQ
+3. **Celery Worker** → Processes task → Updates database
+4. **Status Update** → Mark event as completed or failed
+
+### Event Types
+
+- `DOCUMENT_OCR_REQUESTED`: Document uploaded, needs OCR processing
+- `VOICE_TRANSCRIPTION_REQUESTED`: Audio uploaded, needs transcription
+- `EMAIL_SEND_REQUESTED`: Email needs to be sent
+- `USER_REGISTERED`: New user registered
+- `PROJECT_CREATED`: New project created
+
+---
+
+## Deployment & Infrastructure
+
+### Docker Compose Services
+
+#### Core Services
+- **api**: FastAPI application (Port 8000)
+- **db**: PostgreSQL 15 database (Port 5432)
+- **redis**: Redis cache and rate limiting (Port 6379)
+- **rabbitmq**: Message broker (Ports 5672, 15672)
+
+#### Background Workers
+- **worker-ocr**: Celery worker for OCR processing
+- **worker-transcription**: Celery worker for audio transcription
+- **worker-email**: Celery worker for email sending
+- **beat**: Celery beat scheduler
+- **flower**: Celery monitoring UI (Port 5555)
+
+### Environment Configuration
+
+#### Required Environment Variables
+```bash
+# Database
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+POSTGRES_DB=alta_data
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+
+# Redis
+REDIS_URL=redis://redis:6379/0
+
+# RabbitMQ
+RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672//
+
+# Application
+SECRET_KEY=your-secret-key
+APP_ENV=development
+```
+
+#### Optional Environment Variables
+```bash
+# Google Cloud (Optional)
+GCS_PROJECT_ID=your-project-id
+GCS_BUCKET_NAME=your-bucket-name
+GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+DOCUMENT_AI_PROCESSOR_ID=your-processor-id
+DOCUMENT_AI_LOCATION=us
+
+# Email Service (Optional)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your-email@example.com
+SMTP_PASSWORD=your-password
+SMTP_FROM=no-reply@altadata.com
+
+# CORS
+CORS_ORIGINS_RAW=http://localhost:3000,http://localhost:8000
+```
+
+### Quick Start
+
+1. **Clone and Setup**:
+   ```bash
+   git clone <repository>
+   cd alta_data_backend
+   cp env.example .env
+   # Edit .env with your configuration
+   ```
+
+2. **Start Services**:
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Run Migrations**:
+   ```bash
+   docker-compose exec api alembic upgrade head
+   ```
+
+4. **Access Points**:
+   - **API**: http://localhost:8000
+   - **API Documentation**: http://localhost:8000/docs
+   - **RabbitMQ Management**: http://localhost:15672 (guest/guest)
+   - **Flower (Celery Monitor)**: http://localhost:5555
+
+### Production Deployment
+
+#### Azure Deployment
+- **Compute**: Azure Container Apps or Azure Kubernetes Service
+- **Database**: Azure Database for PostgreSQL
+- **Cache**: Azure Cache for Redis
+- **Storage**: Azure Blob Storage (alternative to GCS)
+- **Secrets**: Azure Key Vault
+- **Monitoring**: Azure Monitor and Application Insights
+
+#### Scaling
+```bash
+# Scale workers
+docker-compose up -d --scale worker-ocr=3 --scale worker-email=2
+
+# Scale API
+docker-compose up -d --scale api=3
+```
+
+---
+
+## Security Features
+
+### Authentication & Authorization
+- **JWT Tokens**: Stateless authentication with configurable expiration
+- **Email Verification**: Required for account activation
+- **Role-Based Access Control**: Granular permissions per user role
+- **Password Security**: Bcrypt hashing with salt
+
+### Rate Limiting
+- **Redis-based**: Request throttling per IP and user
+- **Endpoint-specific**: Different limits for auth vs. data endpoints
+- **Graceful Degradation**: System continues to function if Redis is unavailable
+
+### Input Validation
+- **Pydantic Models**: Request/response validation
+- **File Upload Validation**: Type, size, and content validation
+- **SQL Injection Prevention**: Parameterized queries via ORM
+
+### Security Headers
+- **CORS Protection**: Configurable allowed origins
+- **Security Headers**: X-Content-Type-Options, X-Frame-Options, etc.
+- **Request Correlation**: Unique request IDs for tracing
+
+### Audit Logging
+- **Comprehensive Logging**: All user actions and system events
+- **Immutable Records**: Audit logs cannot be modified
+- **Compliance Ready**: Detailed audit trail for regulatory requirements
+
+### Data Protection
+- **Soft Deletes**: Data recovery capability
+- **Encryption at Rest**: Database and file storage encryption
+- **Secure Token Storage**: Hashed tokens in database
+- **Principle of Least Privilege**: Minimal required permissions
+
+---
+
+## Monitoring & Observability
+
+### Health Monitoring
+- **Health Checks**: Database, Redis, and RabbitMQ connectivity
+- **Readiness Probes**: Service availability checks
+- **Liveness Probes**: Application health verification
+
+### Logging
+- **Structured Logging**: JSON format with correlation IDs
+- **Request Tracing**: End-to-end request tracking
+- **Error Tracking**: Detailed error context and stack traces
+- **Audit Trail**: Complete action history
+
+### Metrics & Analytics
+- **Performance Metrics**: Response times, throughput, error rates
+- **Business Metrics**: User activity, data processing statistics
+- **System Metrics**: Resource utilization, queue depths
+- **Custom Dashboards**: Project-specific analytics
+
+### Monitoring Tools
+- **Flower**: Celery worker monitoring
+- **RabbitMQ Management**: Queue and message monitoring
+- **Database Monitoring**: Query performance and connection pools
+- **Application Insights**: Azure-based monitoring (production)
+
+### Alerting
+- **Service Health**: Automatic alerts for service failures
+- **Performance Thresholds**: Response time and error rate alerts
+- **Queue Monitoring**: Dead letter queue and processing delays
+- **Security Events**: Failed authentication and suspicious activity
+
+---
+
+## API Usage Examples
+
+### Complete Workflow Example
+
+1. **User Registration**:
+   ```bash
+   curl -X POST http://localhost:8000/api/auth/register \
+     -H "Content-Type: application/json" \
+     -d '{"email": "user@example.com", "password": "SecurePass123!"}'
+   ```
+
+2. **Email Verification**:
+   ```bash
+   curl -X GET "http://localhost:8000/api/auth/verify-email?token=verification-token"
+   ```
+
+3. **User Login**:
+   ```bash
+   curl -X POST http://localhost:8000/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"email": "user@example.com", "password": "SecurePass123!"}'
+   ```
+
+4. **Create Project**:
+   ```bash
+   curl -X POST http://localhost:8000/api/projects \
+     -H "Authorization: Bearer jwt-token" \
+     -H "Content-Type: application/json" \
+     -d '{"name": "My Research Project", "description": "Data collection project"}'
+   ```
+
+5. **Upload Document**:
+   ```bash
+   curl -X POST "http://localhost:8000/api/documents?project_id=project-uuid" \
+     -H "Authorization: Bearer jwt-token" \
+     -F "file=@document.pdf"
+   ```
+
+6. **Submit for Review**:
+   ```bash
+   curl -X POST http://localhost:8000/api/submit \
+     -H "Authorization: Bearer jwt-token" \
+     -H "Content-Type: application/json" \
+     -d '{"document_ids": ["doc-uuid"]}'
+   ```
+
+7. **Review Decision**:
+   ```bash
+   curl -X PATCH "http://localhost:8000/api/review/doc-uuid?item_type=document" \
+     -H "Authorization: Bearer jwt-token" \
+     -H "Content-Type: application/json" \
+     -d '{"decision": "approve", "feedback": "Good quality"}'
+   ```
+
+### Error Handling
+
+All API endpoints return structured error responses:
+
+```json
+{
+  "error": {
+    "type": "validation_error|auth_error|not_found|rate_limited|server_error",
+    "message": "Detailed error message",
+    "requestId": "unique-request-id"
+  }
+}
+```
+
+### Rate Limiting
+
+Rate limits are applied per endpoint:
+- **Auth endpoints**: 10 requests/minute per IP
+- **Data upload**: 20 requests/minute per user
+- **General API**: 100 requests/minute per user
+
+
