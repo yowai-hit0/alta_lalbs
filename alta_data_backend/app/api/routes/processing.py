@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from ...database import get_db
-from ...models.data import Document, VoiceSample
+from ...models.data import Document, VoiceSample, RawText
 from ...models.project import ProjectMember
 from ..dependencies import get_current_user, project_role_required
 from ...worker.tasks import task_process_ocr, task_transcribe_audio
@@ -120,12 +120,12 @@ async def trigger_transcription(
 
 @router.get('/status/{item_id}')
 async def get_processing_status(
-    item_id: str = Path(..., description="Document or voice sample ID"),
-    item_type: str = Query(..., description="Type: 'document' or 'voice'"),
+    item_id: str = Path(..., description="Item ID"),
+    item_type: str = Query(..., description="Type: 'document', 'voice', or 'raw_text'"),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Get processing status for a document or voice sample"""
+    """Get processing status for a document, voice sample, or raw text"""
     if item_type == 'document':
         item = await db.execute(
             select(Document).where(Document.id == item_id)
@@ -136,8 +136,13 @@ async def get_processing_status(
             select(VoiceSample).where(VoiceSample.id == item_id)
         )
         item = item.scalar_one_or_none()
+    elif item_type == 'raw_text':
+        item = await db.execute(
+            select(RawText).where(RawText.id == item_id)
+        )
+        item = item.scalar_one_or_none()
     else:
-        raise HTTPException(status_code=400, detail='Invalid item type. Must be "document" or "voice"')
+        raise HTTPException(status_code=400, detail='Invalid item type. Must be "document", "voice", or "raw_text"')
     
     if not item:
         raise HTTPException(status_code=404, detail='Item not found')
@@ -152,15 +157,24 @@ async def get_processing_status(
     if not project_member.scalar_one_or_none():
         raise HTTPException(status_code=403, detail='Access denied to project')
     
-    return {
-        'id': item.id,
-        'type': item_type,
-        'processed': item.processed,
-        'status': item.status,
-        'has_content': bool(
-            item.ocr_text if item_type == 'document' else item.transcription_text
-        )
-    }
+    if item_type == 'raw_text':
+        return {
+            'id': item.id,
+            'type': item_type,
+            'processed': True,
+            'status': item.status,
+            'has_content': True
+        }
+    else:
+        return {
+            'id': item.id,
+            'type': item_type,
+            'processed': item.processed,
+            'status': item.status,
+            'has_content': bool(
+                item.ocr_text if item_type == 'document' else item.transcription_text
+            )
+        }
 
 
 @router.post('/batch-ocr')

@@ -24,19 +24,27 @@ class ReviewDecisionRequest(BaseModel):
 
 
 class SubmitForReviewRequest(BaseModel):
-    """Submit for review request"""
-    document_id: str = Field(..., description="Document ID")
+    """Submit for review request for any item type"""
+    item_id: str = Field(..., description="ID of the item to submit")
+    item_type: str = Field(..., description="Type: 'document', 'voice', or 'raw_text'")
     priority: Optional[str] = Field("normal", description="Review priority")
     notes: Optional[str] = Field(None, max_length=1000, description="Submission notes")
     
-    @validator('document_id')
-    def validate_document_id(cls, v):
-        """Validate document ID format"""
+    @validator('item_id')
+    def validate_item_id(cls, v):
+        """Validate item ID format"""
         try:
             uuid.UUID(v)
             return v
         except ValueError:
-            raise ValueError('Invalid document ID format')
+            raise ValueError('Invalid item ID format')
+    
+    @validator('item_type')
+    def validate_item_type(cls, v):
+        allowed_types = ['document', 'voice', 'raw_text']
+        if v not in allowed_types:
+            raise ValueError(f"Invalid item type. Must be one of: {', '.join(allowed_types)}")
+        return v
     
     @validator('priority')
     def validate_priority(cls, v):

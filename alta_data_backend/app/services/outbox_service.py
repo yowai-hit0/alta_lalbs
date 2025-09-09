@@ -145,17 +145,23 @@ class OutboxService:
                 OutboxEventType.DOCUMENT_OCR_REQUESTED.value: {
                     "task": "app.worker.tasks.task_process_ocr",
                     "queue": "ocr_queue",
-                    "routing_key": "ocr"
+                    "routing_key": "ocr",
+                    "args": lambda payload, aggregate_id: [aggregate_id],
+                    "kwargs": lambda payload: {}
                 },
                 OutboxEventType.VOICE_TRANSCRIPTION_REQUESTED.value: {
                     "task": "app.worker.tasks.task_transcribe_audio",
                     "queue": "transcription_queue",
-                    "routing_key": "transcription"
+                    "routing_key": "transcription",
+                    "args": lambda payload, aggregate_id: [aggregate_id],
+                    "kwargs": lambda payload: {}
                 },
                 OutboxEventType.EMAIL_SEND_REQUESTED.value: {
                     "task": "app.worker.tasks.task_send_email",
                     "queue": "email_queue",
-                    "routing_key": "email"
+                    "routing_key": "email",
+                    "args": lambda payload, aggregate_id: [payload.get("to_email"), payload.get("subject"), payload.get("body")],
+                    "kwargs": lambda payload: {"email_type": payload.get("email_type", "general")}
                 }
             }
             
@@ -168,8 +174,8 @@ class OutboxService:
             # Send task to Celery with RabbitMQ
             celery_app.send_task(
                 task_config["task"],
-                args=[event.aggregate_id],
-                kwargs=payload,
+                args=task_config["args"](payload, event.aggregate_id),
+                kwargs=task_config["kwargs"](payload),
                 queue=task_config["queue"],
                 routing_key=task_config["routing_key"]
             )

@@ -153,5 +153,3 @@ async def review_decision(
         'reviewed_by': current_user.id,
         'feedback': request.feedback
     }
-
-

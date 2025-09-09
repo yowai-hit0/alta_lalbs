@@ -27,7 +27,7 @@ gcloud config set project alta-data-backend
 **Alternative: Use GCP Console**
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Click "Select a project" → "New Project"
-3. Enter project name: `alta-data-backend`
+3. Enter project name: `alta-data-backend` //alta-data-services
 4. Click "Create"
 
 ### **2. Enable Required APIs**

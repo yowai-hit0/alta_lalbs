@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     app_env: str = 'development'
     app_name: str = 'alta_data'
-    secret_key: str = 'changeme'
+    secret_key: str = '8x4W0Iu7yzw0UwLRADAfhH2bflyh5R2a'
     jwt_alg: str = 'HS256'
 
     postgres_host: str = 'db'

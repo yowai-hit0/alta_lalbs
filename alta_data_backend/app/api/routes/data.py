@@ -56,11 +56,14 @@ def validate_file_upload(file: UploadFile, allowed_types: set, max_size: int = M
 async def upload_document(
     project_id: str = Query(..., description="Project ID"),
     domain: str | None = Query(None, description="Document domain"),
-    is_raw: bool = Query(False, description="Mark as raw text (manual entry)"),
+    is_raw: bool = Query(False, description="Deprecated. Use /raw-text for manual entries."),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(project_role_required('admin', 'contributor')),
 ):
+    # Forbid raw text via /documents
+    if is_raw:
+        raise HTTPException(status_code=400, detail='Raw text uploads are not supported via /documents. Use /raw-text instead.')
     # Validate request parameters
     upload_request = DocumentUploadRequest(project_id=project_id, domain=domain)
     
@@ -86,11 +89,10 @@ async def upload_document(
     if is_gcs_available():
         blob_path = f'documents/{project_id}/{datetime.now(timezone.utc).timestamp()}_{file.filename}'
         bucket = settings.gcs_bucket_name
-    
-    try:
-        gcs_uri = upload_bytes(bucket, blob_path, content, file.content_type or 'application/octet-stream')
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Upload failed: {str(e)}')
+        try:
+            gcs_uri = upload_bytes(bucket, blob_path, content, file.content_type or 'application/octet-stream')
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f'Upload failed: {str(e)}')
     else:
         # Use local storage when GCS is not available
         gcs_uri = f'local://documents/{project_id}/{datetime.now(timezone.utc).timestamp()}_{file.filename}'
@@ -102,30 +104,28 @@ async def upload_document(
         original_filename=file.filename,
         gcs_uri=gcs_uri,
         domain=domain,
-        is_raw=is_raw,
-        processed=is_raw,  # Raw documents are considered "processed" since no OCR needed
+        is_raw=False,
+        processed=False,
     )
     db.add(doc)
     await db.flush()  # Get the ID without committing
     
     try:
-        # Only create outbox event for OCR processing if not raw text
-        if not is_raw:
-            from ...services.outbox_service import outbox_service
-            from ...models.outbox import OutboxEventType
+        from ...services.outbox_service import outbox_service
+        from ...models.outbox import OutboxEventType
 
-            await outbox_service.create_event(
-                session=db,
-                event_type=OutboxEventType.DOCUMENT_OCR_REQUESTED,
-                aggregate_id=doc.id,
-                aggregate_type="Document",
-                payload={
-                    "document_id": doc.id,
-                    "gcs_uri": gcs_uri,
-                    "filename": file.filename,
-                    "domain": domain
-                }
-            )
+        await outbox_service.create_event(
+            session=db,
+            event_type=OutboxEventType.DOCUMENT_OCR_REQUESTED,
+            aggregate_id=doc.id,
+            aggregate_type="Document",
+            payload={
+                "document_id": doc.id,
+                "gcs_uri": gcs_uri,
+                "filename": file.filename,
+                "domain": domain
+            }
+        )
 
         await db.commit()
 
@@ -137,8 +137,8 @@ async def upload_document(
         'id': doc.id, 
         'gcs_uri': gcs_uri, 
         'status': 'draft',
-        'is_raw': is_raw,
-        'processed': is_raw
+        'is_raw': False,
+        'processed': False
     }
 
 
@@ -174,11 +174,10 @@ async def upload_voice(
     if is_gcs_available():
         blob_path = f'voice/{project_id}/{datetime.now(timezone.utc).timestamp()}_{file.filename}'
         bucket = settings.gcs_bucket_name
-    
-    try:
-        gcs_uri = upload_bytes(bucket, blob_path, content, file.content_type or 'application/octet-stream')
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Upload failed: {str(e)}')
+        try:
+            gcs_uri = upload_bytes(bucket, blob_path, content, file.content_type or 'application/octet-stream')
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f'Upload failed: {str(e)}')
     else:
         # Use local storage when GCS is not available
         gcs_uri = f'local://voice/{project_id}/{datetime.now(timezone.utc).timestamp()}_{file.filename}'
@@ -251,7 +250,7 @@ async def create_raw_text(
         content=payload.content,
         domain=payload.domain,
         tags=json.dumps(payload.tags) if payload.tags else None,
-        metadata=json.dumps(payload.metadata) if payload.metadata else None,
+        extra_metadata=json.dumps(payload.extra_metadata) if payload.extra_metadata else None,
         status='draft'
     )
     
@@ -342,8 +341,8 @@ async def update_raw_text(
         raw_text.domain = payload.domain
     if payload.tags is not None:
         raw_text.tags = json.dumps(payload.tags) if payload.tags else None
-    if payload.metadata is not None:
-        raw_text.metadata = json.dumps(payload.metadata) if payload.metadata else None
+    if payload.extra_metadata is not None:
+        raw_text.extra_metadata = json.dumps(payload.extra_metadata) if payload.extra_metadata else None
     
     await db.commit()
     

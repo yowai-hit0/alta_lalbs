@@ -8,7 +8,7 @@ from ...database import get_db
 from ...models.project import Project, ProjectMember
 from ...models.user import User
 from ...models.invitation import EmailVerificationToken, ProjectInvitation
-from ...models.data import Document
+from ...models.data import Document, VoiceSample, RawText
 from ...schemas.project import ProjectResponse
 from ...schemas.project_validators import (
     ProjectCreateRequest, ProjectUpdateRequest, ProjectInvitationRequest, 
@@ -89,7 +89,34 @@ async def invite_member(
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     exp = datetime.now(timezone.utc) + timedelta(days=7)
     db.add(ProjectInvitation(project_id=project_id, email=payload.email, role=payload.role, token_hash=token_hash, invited_by_id=current_user.id, expires_at=exp))
-    await db.commit()
+    await db.flush()  # Get the ID without committing
+
+    # Send invitation email via outbox
+    try:
+        from ...services.outbox_service import outbox_service
+        from ...models.outbox import OutboxEventType
+        
+        invite_link = f'https://frontend.example.com/accept-invitation?token={raw_token}'
+        project_name = (await db.execute(select(Project.name).where(Project.id == project_id))).scalar_one()
+        
+        await outbox_service.create_event(
+            session=db,
+            event_type=OutboxEventType.EMAIL_SEND_REQUESTED,
+            aggregate_id=project_id,
+            aggregate_type="Project",
+            payload={
+                "to_email": payload.email,
+                "subject": f"Invitation to join project: {project_name}",
+                "body": f"You have been invited to join the project '{project_name}' as a {payload.role}. Click the link to accept: {invite_link}",
+                "email_type": "project_invitation"
+            }
+        )
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        # Don't fail the invitation if email fails
+        pass
+
     return {'invited': True, 'token': raw_token}
 
 
@@ -113,15 +140,39 @@ async def accept_invitation(request: InvitationAcceptRequest = Body(...), db: As
 
 @router.post('/{project_id}/review')
 async def submit_for_review(project_id: str = Path(..., description='Project ID'), body: SubmitForReviewRequest = Body(...), db: AsyncSession = Depends(get_db), current_user=Depends(project_role_required('admin', 'contributor'))):
-    d = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
-    if not d:
+    project = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+    if not project:
         raise HTTPException(status_code=404, detail='Project not found')
-    doc = (await db.execute(select(Document).where(Document.id == body.documentId, Document.project_id == project_id))).scalar_one_or_none()
-    if not doc:
-        raise HTTPException(status_code=404, detail='Document not found')
-    doc.status = 'pending_review'
-    doc.submitted_at = datetime.now(timezone.utc)
+
+    item = None
+    if body.item_type == 'document':
+        item = (await db.execute(select(Document).where(Document.id == body.item_id, Document.project_id == project_id))).scalar_one_or_none()
+        if not item:
+            raise HTTPException(status_code=404, detail='Document not found')
+        # Ownership for contributors
+        if current_user.global_role != 'super_admin' and current_user.id != item.uploaded_by_id and current_user.global_role != 'admin':
+            raise HTTPException(status_code=403, detail='Not allowed to submit this document')
+    elif body.item_type == 'voice':
+        item = (await db.execute(select(VoiceSample).where(VoiceSample.id == body.item_id, VoiceSample.project_id == project_id))).scalar_one_or_none()
+        if not item:
+            raise HTTPException(status_code=404, detail='Voice sample not found')
+        if current_user.global_role != 'super_admin' and current_user.id != item.uploaded_by_id and current_user.global_role != 'admin':
+            raise HTTPException(status_code=403, detail='Not allowed to submit this voice sample')
+    elif body.item_type == 'raw_text':
+        item = (await db.execute(select(RawText).where(RawText.id == body.item_id, RawText.project_id == project_id))).scalar_one_or_none()
+        if not item:
+            raise HTTPException(status_code=404, detail='Raw text not found')
+        if current_user.global_role != 'super_admin' and current_user.id != item.created_by_id and current_user.global_role != 'admin':
+            raise HTTPException(status_code=403, detail='Not allowed to submit this raw text')
+    else:
+        raise HTTPException(status_code=400, detail='Invalid item type')
+
+    if item.status != 'draft':
+        raise HTTPException(status_code=400, detail='Only draft items can be submitted')
+
+    item.status = 'pending_review'
+    item.submitted_at = datetime.now(timezone.utc)
     await db.commit()
-    return {'submitted': True, 'id': doc.id}
+    return {'submitted': True, 'id': body.item_id, 'type': body.item_type}
 
 

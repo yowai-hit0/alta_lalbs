@@ -93,6 +93,8 @@ async def register(payload: RegisterRequest = Body(...), db: AsyncSession = Depe
                 "email_type": "email_verification"
             }
         )
+        # Ensure the outbox event is persisted
+        await db.commit()
     except Exception:
         pass
 

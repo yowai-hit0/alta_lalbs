@@ -359,7 +359,3 @@ docker-compose exec redis redis-cli ping
 4. **Use health check endpoints** to monitor service status
 5. **Implement proper fallbacks** for critical functionality
 6. **Test with and without external services** during development
-
----
-
-**The Alta Data Backend is designed to be resilient and flexible, allowing you to run it in any environment with any combination of available services!** 🚀
